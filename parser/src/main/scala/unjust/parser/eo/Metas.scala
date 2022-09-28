@@ -1,0 +1,79 @@
+package unjust.parser.eo
+
+import cats.data.NonEmptyList
+import cats.parse.Parser0
+import cats.parse.SemVer.semverString
+import cats.parse.{Parser => P}
+import unjust.EOAliasMeta
+import unjust.EOMetas
+import unjust.EOOtherMeta
+import unjust.EORTMeta
+import unjust.parser.eo.Tokens._
+
+object Metas {
+
+  private val packageName =
+    identifier
+      .repSep(1, P.char('.'))
+      .string
+
+  val packageMeta: P[String] =
+    P.string("+package") *> wsp *> packageName
+
+  private val aliasName = identifier
+
+  private val packageNameSplit = identifier.repSep(1, P.char('.'))
+
+  val aliasMetaTail: P[(Option[String], NonEmptyList[String])] =
+    (aliasName ~ (wsp *> packageNameSplit)).map { case (alias, name) =>
+      (Some(alias), name)
+    }.backtrack |
+      packageNameSplit.map(name => (None, name))
+
+  val aliasMeta: P[EOAliasMeta] = (
+    P.string("+alias") *> wsp *> aliasMetaTail
+  ).map { case (alias, src) =>
+    EOAliasMeta(alias, src)
+  }
+
+  val otherMeta: P[EOOtherMeta] = {
+    val justHead = (P.char('+') *> identifier)
+    val headWithTail = (
+      ((justHead <* wsp) ~ identifier.repSep0(wsp)) <* optWsp
+    ).map { case (head, tail) =>
+      EOOtherMeta(head, tail)
+    }
+
+    headWithTail.backtrack | justHead.map(head => EOOtherMeta(head, Seq()))
+  }
+
+  private val artifactId = {
+
+    val artifactName = identifier
+    val artifactVersion = semverString
+
+    (
+      packageName ~
+        artifactName.surroundedBy(P.char(':')) ~
+        artifactVersion
+    ).string
+  }
+
+  val rtMeta: P[EORTMeta] = (
+    P.string("+rt") *>
+      aliasName.surroundedBy(wsp) ~
+      artifactId
+  ).map { case (alias, src) =>
+    EORTMeta(alias, src)
+  }
+
+  val metas: Parser0[EOMetas] = (
+    (emptyLinesOrComments *> (packageMeta <* eol).?) ~
+      (emptyLinesOrComments
+        .with1
+        .soft *> ((rtMeta.backtrack | aliasMeta.backtrack | otherMeta) <* eol)).rep0
+  ).map { case (pkg, metas) =>
+    EOMetas(pkg, metas.toVector)
+  }
+
+}
