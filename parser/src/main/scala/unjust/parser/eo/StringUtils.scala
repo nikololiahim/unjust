@@ -3,8 +3,7 @@ package unjust.parser.eo
 import cats.parse.{Parser => P}
 import cats.parse.{Parser0 => P0}
 
-/**
-  * borrowed from:
+/** borrowed from:
   * https://github.com/typelevel/cats-parse/blob/main/bench/src/main/scala/cats/parse/bench/self.scala
   */
 
@@ -43,19 +42,17 @@ object StringUtils {
     }
   }
 
-  /**
-    * String content without the delimiter
+  /** String content without the delimiter
     */
   def undelimitedString(endP: P[Unit]): P[String] =
-    escapedToken
-      .backtrack
+    escapedToken.backtrack
       .orElse((!endP).with1 ~ P.anyChar)
       .rep
       .string
       .flatMap { str =>
         unescape(str) match {
           case Right(str1) => P.pure(str1)
-          case Left(_) => P.fail
+          case Left(_)     => P.fail
         }
       }
 
@@ -63,14 +60,13 @@ object StringUtils {
     P.charsWhile0(c => c >= ' ' && c != '"' && c != '\\')
 
   def escapedString(q: Char): P[String] = {
-    val end: P[Unit] = P.char(q)
-    end *> (simpleString <* end)
-      .backtrack
-      .orElse(undelimitedString(end) <* end)
+    val ed: P[Unit] = P.char(q)
+    ed *> (simpleString <* ed).backtrack
+      .orElse(undelimitedString(ed) <* ed)
   }
 
   // Here are the rules for escaping in json
-  val decodeTable: Map[Char, Char] =
+  lazy val decodeTable: Map[Char, Char] =
     Map(
       ('\\', '\\'),
       ('\'', '\''),
@@ -149,10 +145,10 @@ object StringUtils {
                 loop(idx + 2)
               case None =>
                 c match {
-                  case 'o' => loop(decodeNum(idx + 2, 2, 8))
-                  case 'x' => loop(decodeNum(idx + 2, 2, 16))
-                  case 'u' => loop(decodeNum(idx + 2, 4, 16))
-                  case 'U' => loop(decodeNum(idx + 2, 8, 16))
+                  case 'o'   => loop(decodeNum(idx + 2, 2, 8))
+                  case 'x'   => loop(decodeNum(idx + 2, 2, 16))
+                  case 'u'   => loop(decodeNum(idx + 2, 4, 16))
+                  case 'U'   => loop(decodeNum(idx + 2, 8, 16))
                   case other =>
                     // \c is interpreted as just \c, if the character isn't
                     // escaped
@@ -169,6 +165,5 @@ object StringUtils {
     if (res < 0) Left(~res)
     else Right(sb.toString)
   }
-
 
 }

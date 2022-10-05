@@ -1,0 +1,11 @@
+# All methods are referentially transparent with recursion
+[] > test
+  [] > base
+    [self v] > n
+      2 > @
+    [self v] > m
+      self.m self v > @
+  [] > derived
+    base > @
+    [self v] > n
+      self.m self v > @
